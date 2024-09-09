@@ -6,7 +6,7 @@
     CLITERAL(Color) { 38, 38, 38, 255 }
 
 int main(void) {
-    InitWindow(WIDTH, HEIGHT, "raylib [core] example - basic window");
+    InitWindow(WIDTH, HEIGHT, "Todo App");
 
     SetTargetFPS(60);
 
