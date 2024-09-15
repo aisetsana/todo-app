@@ -33,7 +33,6 @@ typedef struct {
 
 } Task;
 
-// TODO do something like static Task t; https://github.com/cococry/ticalc/blob/main/ticalc.c line 38
 
 static int tasks = 0;
 Font font;
@@ -290,15 +289,7 @@ int main(void) {
 
             } break;
         }
-        // check for mouse clicks and add a task
 
-        // DrawRectangleLinesEx(add, 1, BLANK);  // draw an invisible box to check for collision
-        // if (CheckCollisionPointRec(GetMousePosition(), add)) {
-        //     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        //         appendToCfg("test", HIGH);
-        //         addTask("test", HIGH, getFileLines(getLocation()) - 1);  // one minus for the last newline char and one minus because IDs begin from 0 :P
-        //     }
-        // }
         EndDrawing();
     }
     UnloadTexture(addTexture);
