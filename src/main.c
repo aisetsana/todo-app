@@ -1,25 +1,309 @@
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+
+#include "../include/file_mng.h"
 #include "../include/raylib.h"
 
-#define WIDTH 800
-#define HEIGHT 450
+#define WIDTH 1045
+#define HEIGHT 596
 #define BACKGROUND_COLOR \
-    CLITERAL(Color) { 38, 38, 38, 255 }
+    CLITERAL(Color) { 30, 30, 30, 255 }
+#define FONT_SIZE 36
+
+typedef enum Priority {
+    LOW,
+    MEDIUM,
+    HIGH,
+} Priority;
+
+typedef enum Screen {
+    MAIN_SCREEN,
+    CREATE_SCREEN,
+} Screen;
+
+typedef struct {
+    const char *title;
+    Priority priority;
+    int id;
+
+} Task;
+
+// TODO do something like static Task t; https://github.com/cococry/ticalc/blob/main/ticalc.c line 38
+
+static int tasks = 0;
+Font font;
+Font thinFont;
+
+Task array[128];
+
+Task getTask(int n) {
+    return array[n];
+}
+
+void addTask(const char *title, int priority, int id) {
+    tasks++;
+
+    // initialize the array
+    array[id].title = title;
+    array[id].priority = priority;
+    array[id].id = id;
+}
+
+void loadTasks() {
+    for (int i = 0; i < getFileLines(getLocation()); i++) {
+        addTask(loadTaskName(getLocation(), i, 1),         // name
+                strtol(loadTaskName(getLocation(), i, 2),  // prio
+                       NULL, 10),
+                strtol(loadTaskName(getLocation(), i, 3), NULL, 10));  // id
+    }
+}
+int getPriority(char* prio) {
+    if (strcmp(prio, "LOW") == 0)
+        return 0;
+    else if (strcmp(prio, "MEDIUM") == 0)
+        return 1;
+    else if (strcmp(prio, "HIGH") == 0)
+        return 2;
+    else return -1;
+}
+void drawTextWithShadow(Font font, const char *title, Vector2 position, int fontSize, int spacing, int offset, Color color) {
+    DrawTextEx(font, title, (Vector2){position.x - offset, position.y + offset}, fontSize, spacing, CLITERAL(Color){0, 0, 0, 100});
+    DrawTextEx(font, title, position, fontSize, spacing, color);
+}
+
+void drawTasks() {
+    Color circleColor[3] = {GREEN, YELLOW, RED};
+
+    int fontSize = 20;
+    for (int i = 0; i < tasks; i++) {
+        Task task = getTask(i);
+        int seconds = strtol(loadTaskName(getLocation(), i + 1, 4), NULL, 10);
+        time_t t = seconds;
+        struct tm *time = localtime(&t);
+        int x = 15;
+        int y = 96 + (48 * i);
+        int radius = 7;
+        int offset = 15;
+
+        DrawCircle(x, y + MeasureTextEx(font, task.title, fontSize, 2).y / 2, radius, circleColor[task.priority]);
+        DrawTextEx(font, task.title, (Vector2){x + radius + offset, y - MeasureTextEx(font, task.title, fontSize, 2).y / 2}, fontSize, 2, RAYWHITE);
+        DrawTextEx(thinFont,
+                   TextFormat("%d-%02d-%02d %02d:%02d:%02d", time->tm_year + 1900, time->tm_mon, time->tm_mday,
+                              time->tm_hour, time->tm_min, time->tm_sec),
+                   (Vector2){x + radius + offset, y + MeasureTextEx(font, task.title, fontSize, 2).y / 2}, fontSize - 2, 2, RAYWHITE);
+    }
+}
 
 int main(void) {
-    InitWindow(WIDTH, HEIGHT, "Todo App");
+    const char *title = "TodoMate";
+    InitWindow(WIDTH, HEIGHT, title);
+    createFile();
+    float x, y;
+    thinFont = LoadFontEx("resources\\fonts\\AzeretMono-ExtraLight.ttf", FONT_SIZE, 0, 250);
+    font = LoadFontEx("resources\\fonts\\AzeretMono-Medium.ttf", FONT_SIZE, 0, 250);
+    SetTextureFilter(font.texture, TEXTURE_FILTER_TRILINEAR);  // Upscale the font
 
+    Image addButton = LoadImage("resources\\icons\\add.png");  // load into cpu
+    Texture2D addTexture = LoadTextureFromImage(addButton);       // load into gpu
+    Image backImage = LoadImage("resources\\icons\\back.png");
+    Texture2D backTexture = LoadTextureFromImage(backImage);       // load into gpu
+    UnloadImage(addButton);                                    // unload from cpu
+    UnloadImage(backImage);
+
+    Screen currentScreen = MAIN_SCREEN;
+
+    Color color = RAYWHITE;
+    loadTasks();
+
+    x = 15;
+    y = 15;
+    bool mouseOnText = false;
+    int textBoxLetterCount = 0;
+    int prioBoxLetterCount = 0;
+    int padding = 64;
+
+    char textBoxInput[32];
+    char prioBoxInput[32];
+
+    float addScale = 1.5f;
+    float backScale = 0.1f;
+    float addX = WIDTH - (32 * addScale);
+    float addY = 1;
+    int width = MeasureTextEx(font, title, FONT_SIZE, 2).x;
+    int height = MeasureTextEx(font, title, FONT_SIZE, 2).y;
+    int focus = 0; // focus on name box
+
+    Rectangle rec = {
+        .x = x, .y = y, .width = width, .height = height,
+        };
+
+    Rectangle add = {
+        .x = addX, .y = addY, .width = width, .height = height,
+    };
+    Rectangle backButton = {
+        .x = 10, .y = 10, .width = 512 * backScale , .height = 512 * backScale
+        };
+    Rectangle textBox = { 
+        .x = 25, .y = 10 + 32 + padding, .width = 250, .height = 40,
+    };
+    Rectangle prioBox = { 
+        .x = 25, .y = textBox.y *2, .width = 250, .height = 40,
+    };
+    Rectangle saveBox = { 
+        .x = 25, .y = HEIGHT - 100, .width = 120, .height = 50,
+    };
+    int frames = 0;
     SetTargetFPS(60);
-
+    SetExitKey(0);  // set to NULL so it doesn't exit by pressing ESCAPE
     while (!WindowShouldClose()) {
+        switch (currentScreen) {
+            case MAIN_SCREEN: {
+                DrawRectangleLinesEx(add, 1, BLANK);  // draw an invisible box to check for collision
+                if (CheckCollisionPointRec(GetMousePosition(), add)) {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                        currentScreen = CREATE_SCREEN;
+                    }
+                } 
+            } break;
+            case CREATE_SCREEN: {
+                DrawRectangleLinesEx(backButton, 1, BLANK);  // draw an invisible box to check for collision
+                if (CheckCollisionPointRec(GetMousePosition(), backButton)) {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                        currentScreen = MAIN_SCREEN;
+                    }
+                }
+
+                if (CheckCollisionPointRec(GetMousePosition(), textBox) || CheckCollisionPointRec(GetMousePosition(), prioBox))
+                    mouseOnText = true;
+                else
+                    mouseOnText = false;
+                if (mouseOnText) {
+                    SetMouseCursor(MOUSE_CURSOR_IBEAM);
+                } else
+                    SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+
+                if(CheckCollisionPointRec(GetMousePosition(), textBox)) {
+                    if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                        focus = 0;
+                    }
+                }
+
+                if(CheckCollisionPointRec(GetMousePosition(), prioBox)) {
+                    if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                        focus = 1;
+                    }
+                }
+
+                int key = GetCharPressed();
+                while (key > 0) {
+                    if (focus == 0) {
+                        if (key >= 32 && key <= 125 && textBoxLetterCount <= 32) {
+                            textBoxInput[textBoxLetterCount] = (char)key;
+                            textBoxInput[textBoxLetterCount + 1] = 0;  // null terminate
+                            textBoxLetterCount++;
+                        }
+                    }
+                    else if (focus == 1) {
+                        if (key >= 32 && key <= 125 && prioBoxLetterCount <= 32) {
+                            prioBoxInput[prioBoxLetterCount] = (char)key;
+                            prioBoxInput[prioBoxLetterCount + 1] = 0;  // null terminate
+                            prioBoxLetterCount++;
+                        }
+                    }
+                    key = GetCharPressed();
+                }
+
+                if (IsKeyPressed(KEY_BACKSPACE)) {
+                    if (focus == 0) {
+                        textBoxLetterCount--;
+                        if (textBoxLetterCount < 0) textBoxLetterCount = 0;
+                        textBoxInput[textBoxLetterCount] = 0;
+                    } else if (focus == 1) {
+                        prioBoxLetterCount--;
+                        if (prioBoxLetterCount < 0) prioBoxLetterCount = 0;
+                        prioBoxInput[prioBoxLetterCount] = 0;
+                    }
+                }
+
+                
+                if (CheckCollisionPointRec(GetMousePosition(), saveBox)) {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                        currentScreen = MAIN_SCREEN;
+                        appendToCfg(textBoxInput, getPriority(prioBoxInput));
+                        addTask(textBoxInput, getPriority(prioBoxInput), getFileLines(getLocation()) - 1); 
+                    }
+                }
+            } break;
+        }
+        frames++;
         BeginDrawing();
-
         ClearBackground(BACKGROUND_COLOR);
+        switch(currentScreen){
+            case MAIN_SCREEN: {
+                DrawRectangleLinesEx(rec, 1, BLANK);  // draw an invisible box to check for collision
+                if (CheckCollisionPointRec(GetMousePosition(), rec)) {
+                    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                        color = LIGHTGRAY;
+                    } else
+                        color = RAYWHITE;
+                }
+                drawTextWithShadow(font, title, (Vector2){x, y}, FONT_SIZE, 1, 3, color);  // draw title
+                DrawLineEx((Vector2){x, MeasureTextEx(font, title, FONT_SIZE, 1).y + y},   // draw title line
+                           (Vector2){MeasureTextEx(font, title, FONT_SIZE, 1).x + x,
+                                     MeasureTextEx(font, title, FONT_SIZE, 1).y + y},
+                           3, WHITE);
 
-        DrawText("Congrats! You created your first window!", 190, 200, 20, RAYWHITE);
+                // draw the add button
 
+                DrawTextureEx(addTexture, (Vector2){addX, addY}, 0, addScale, WHITE);
+                drawTasks();
+
+            } break;
+            case CREATE_SCREEN: {
+                DrawTextureEx(backTexture, (Vector2){10, 10}, 0, backScale, WHITE);
+
+                DrawTextEx(font, "Name: ", (Vector2){25, 10+ padding}, 24, 2, WHITE);
+                DrawRectangleRounded(textBox, 0.2f, 0, WHITE);
+                DrawTextEx(font, textBoxInput, (Vector2){textBox.x+3, textBox.y +8}, 24, 0, BLACK);
+
+                DrawTextEx(font, "Priority: ", (Vector2){25, prioBox.y - padding + 25}, 24, 2, WHITE);
+                DrawRectangleRounded(prioBox, 0.2f, 0, WHITE);
+                DrawTextEx(font, prioBoxInput, (Vector2){prioBox.x + 3 +5, prioBox.y + 8}, 24, 0, BLACK);
+
+                DrawRectangleRounded(saveBox, 0.5f, 0, CLITERAL(Color){ 47, 158, 0, 255 });
+                DrawTextEx(font, "SAVE", (Vector2){(saveBox.x + saveBox.width / 2) - saveBox.x,
+                    saveBox.height / 4 + saveBox.y}, 24, 0, WHITE);
+
+                if ((frames / 30) % 2 == 0) {
+                    if (focus == 0) {
+                        DrawText("|", textBox.x + MeasureTextEx(font, textBoxInput, 24, 0).x, textBox.y + 8, 24, BLACK);
+
+                    } else if (focus == 1) {
+                        DrawText("|", prioBox.x + MeasureTextEx(font, prioBoxInput, 24, 0).x + 8 , prioBox.y + 8, 24, BLACK);
+                    }
+                }
+
+            } break;
+        }
+        // check for mouse clicks and add a task
+
+        // DrawRectangleLinesEx(add, 1, BLANK);  // draw an invisible box to check for collision
+        // if (CheckCollisionPointRec(GetMousePosition(), add)) {
+        //     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        //         appendToCfg("test", HIGH);
+        //         addTask("test", HIGH, getFileLines(getLocation()) - 1);  // one minus for the last newline char and one minus because IDs begin from 0 :P
+        //     }
+        // }
         EndDrawing();
     }
-
+    UnloadTexture(addTexture);
+    UnloadTexture(backTexture);
+    UnloadFont(font);
     CloseWindow();
     return 0;
 }
