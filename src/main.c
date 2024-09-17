@@ -35,6 +35,7 @@ typedef struct {
 
 
 static int tasks = 0;
+int negatives = 0;
 Font font;
 Font thinFont;
 
@@ -48,9 +49,17 @@ void addTask(const char *title, int priority, int id) {
     tasks++;
 
     // initialize the array
+    
+
     array[id].title = title;
     array[id].priority = priority;
     array[id].id = id;
+}
+
+void deleteTask(int id) {
+    negatives--;
+    array[id].id = -1;
+    
 }
 
 void loadTasks() {
@@ -58,7 +67,7 @@ void loadTasks() {
         addTask(loadTaskName(getLocation(), i, 1),         // name
                 strtol(loadTaskName(getLocation(), i, 2),  // prio
                        NULL, 10),
-                strtol(loadTaskName(getLocation(), i, 3), NULL, 10));  // id
+                strtol(loadTaskName(getLocation() + negatives, i, 3), NULL, 10));  // id
     }
 }
 int getPriority(char* prio) {
@@ -75,32 +84,55 @@ void drawTextWithShadow(Font font, const char *title, Vector2 position, int font
     DrawTextEx(font, title, position, fontSize, spacing, color);
 }
 
+
+Texture deleteTexture;
 void drawTasks() {
     Color circleColor[3] = {GREEN, YELLOW, RED};
 
+    int x = 15;
+    int radius = 7;
+    int offset = 15;
     int fontSize = 20;
+    int dropoff  = 0;
+    int dX = WIDTH - 32  - 5;
+
     for (int i = 0; i < tasks; i++) {
         Task task = getTask(i);
+        bool deleted = false;
         int seconds = strtol(loadTaskName(getLocation(), i + 1, 4), NULL, 10);
         time_t t = seconds;
         struct tm *time = localtime(&t);
-        int x = 15;
-        int y = 96 + (48 * i);
-        int radius = 7;
-        int offset = 15;
+        int y = 96 + (48 * i)+dropoff;
+        if (task.id < 0) {
 
-        DrawCircle(x, y + MeasureTextEx(font, task.title, fontSize, 2).y / 2, radius, circleColor[task.priority]);
-        DrawTextEx(font, task.title, (Vector2){x + radius + offset, y - MeasureTextEx(font, task.title, fontSize, 2).y / 2}, fontSize, 2, RAYWHITE);
-        DrawTextEx(thinFont,
-                   TextFormat("%d-%02d-%02d %02d:%02d:%02d", time->tm_year + 1900, time->tm_mon, time->tm_mday,
-                              time->tm_hour, time->tm_min, time->tm_sec),
-                   (Vector2){x + radius + offset, y + MeasureTextEx(font, task.title, fontSize, 2).y / 2}, fontSize - 2, 2, RAYWHITE);
+            dropoff -= 48;
+            deleted = true;
+        }
+
+        if (!deleted) {
+
+            DrawCircle(x, y + MeasureTextEx(font, task.title, fontSize, 2).y / 2 , radius, circleColor[task.priority]);
+            DrawTextEx(font, task.title, (Vector2){x + radius + offset, y - MeasureTextEx(font, task.title, fontSize, 2).y / 2}, fontSize, 2, RAYWHITE);
+            DrawTextEx(thinFont,
+                       TextFormat("%d-%02d-%02d %02d:%02d:%02d", time->tm_year + 1900, time->tm_mon, time->tm_mday,
+                                  time->tm_hour, time->tm_min, time->tm_sec),
+                       (Vector2){x + radius + offset, y + MeasureTextEx(font, task.title, fontSize, 2).y / 2}, fontSize - 2, 2, RAYWHITE);
+            DrawTextureEx(deleteTexture, (Vector2){dX, y}, 0, 1, WHITE);
+            DrawRectangleLines(dX, y, 32, 32, WHITE);
+
+            if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){dX, y, 32, 32})) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    deleteTask(i);
+                    // printf("%d\n", i);
+                }
+            }
+      }
     }
 }
 
 int main(void) {
     const char *title = "TodoMate";
-    InitWindow(WIDTH, HEIGHT, title);
+    InitWindow(WIDTH, HEIGHT, title); // inits window and setups GPU
     createFile();
     float x, y;
     thinFont = LoadFontEx("resources\\fonts\\AzeretMono-ExtraLight.ttf", FONT_SIZE, 0, 250);
@@ -108,11 +140,15 @@ int main(void) {
     SetTextureFilter(font.texture, TEXTURE_FILTER_TRILINEAR);  // Upscale the font
 
     Image addButton = LoadImage("resources\\icons\\add.png");  // load into cpu
-    Texture2D addTexture = LoadTextureFromImage(addButton);       // load into gpu
     Image backImage = LoadImage("resources\\icons\\back.png");
-    Texture2D backTexture = LoadTextureFromImage(backImage);       // load into gpu
+    Image deleteButton = LoadImage("resources\\icons\\del.png");
+
+    Texture2D addTexture = LoadTextureFromImage(addButton);       // load into gpu
+    Texture2D backTexture = LoadTextureFromImage(backImage);
+     deleteTexture = LoadTextureFromImage(deleteButton);       
     UnloadImage(addButton);                                    // unload from cpu
     UnloadImage(backImage);
+    UnloadImage(deleteButton);
 
     Screen currentScreen = MAIN_SCREEN;
 
@@ -126,8 +162,8 @@ int main(void) {
     int prioBoxLetterCount = 0;
     int padding = 64;
 
-    char textBoxInput[32];
-    char prioBoxInput[32];
+    char textBoxInput[32]= "\0";
+    char prioBoxInput[32]= "\0";
 
     float addScale = 1.5f;
     float backScale = 0.1f;
@@ -135,8 +171,9 @@ int main(void) {
     float addY = 1;
     int width = MeasureTextEx(font, title, FONT_SIZE, 2).x;
     int height = MeasureTextEx(font, title, FONT_SIZE, 2).y;
-    int focus = 0; // focus on name box
+    int focus = 0; // which input box to put focus and typing cursor on, 0 is name box by default
 
+    bool inputError = false;
     Rectangle rec = {
         .x = x, .y = y, .width = width, .height = height,
         };
@@ -153,16 +190,20 @@ int main(void) {
     Rectangle prioBox = { 
         .x = 25, .y = textBox.y *2, .width = 250, .height = 40,
     };
+    Rectangle recs[5];
     Rectangle saveBox = { 
         .x = 25, .y = HEIGHT - 100, .width = 120, .height = 50,
     };
+    int dX = WIDTH - (deleteTexture.width) - 5;
+    int dY = 96;
+    int dropoff  = 0;
+
     int frames = 0;
     SetTargetFPS(60);
     SetExitKey(0);  // set to NULL so it doesn't exit by pressing ESCAPE
     while (!WindowShouldClose()) {
         switch (currentScreen) {
             case MAIN_SCREEN: {
-                DrawRectangleLinesEx(add, 1, BLANK);  // draw an invisible box to check for collision
                 if (CheckCollisionPointRec(GetMousePosition(), add)) {
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         currentScreen = CREATE_SCREEN;
@@ -170,7 +211,6 @@ int main(void) {
                 } 
             } break;
             case CREATE_SCREEN: {
-                DrawRectangleLinesEx(backButton, 1, BLANK);  // draw an invisible box to check for collision
                 if (CheckCollisionPointRec(GetMousePosition(), backButton)) {
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         currentScreen = MAIN_SCREEN;
@@ -185,7 +225,10 @@ int main(void) {
                     SetMouseCursor(MOUSE_CURSOR_IBEAM);
                 } else
                     SetMouseCursor(MOUSE_CURSOR_DEFAULT);
-
+                if(IsKeyPressed(KEY_TAB)) {
+                    if(focus == 0) focus =1;
+                    else if(focus == 1) focus = 0;
+                }
                 if(CheckCollisionPointRec(GetMousePosition(), textBox)) {
                     if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                         focus = 0;
@@ -221,20 +264,32 @@ int main(void) {
                     if (focus == 0) {
                         textBoxLetterCount--;
                         if (textBoxLetterCount < 0) textBoxLetterCount = 0;
-                        textBoxInput[textBoxLetterCount] = 0;
+                        textBoxInput[textBoxLetterCount + 1] = 0;
                     } else if (focus == 1) {
                         prioBoxLetterCount--;
                         if (prioBoxLetterCount < 0) prioBoxLetterCount = 0;
-                        prioBoxInput[prioBoxLetterCount] = 0;
+                        prioBoxInput[prioBoxLetterCount+1] = 0;
                     }
                 }
 
                 
                 if (CheckCollisionPointRec(GetMousePosition(), saveBox)) {
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                        currentScreen = MAIN_SCREEN;
-                        appendToCfg(textBoxInput, getPriority(prioBoxInput));
-                        addTask(textBoxInput, getPriority(prioBoxInput), getFileLines(getLocation()) - 1); 
+                        if (strcmp(prioBoxInput, "LOW") == 0 || strcmp(prioBoxInput, "MEDIUM") == 0 || strcmp(prioBoxInput, "HIGH") == 0) {
+                            currentScreen = MAIN_SCREEN;
+                            appendToCfg(textBoxInput, getPriority(prioBoxInput));
+                            addTask(textBoxInput, getPriority(prioBoxInput), getFileLines(getLocation()) - 1);
+
+                            if (inputError) {
+                                inputError = false;
+                            }
+
+                        }
+                        else {
+                            inputError = true;
+
+
+                        }
                     }
                 }
             } break;
@@ -244,7 +299,6 @@ int main(void) {
         ClearBackground(BACKGROUND_COLOR);
         switch(currentScreen){
             case MAIN_SCREEN: {
-                DrawRectangleLinesEx(rec, 1, BLANK);  // draw an invisible box to check for collision
                 if (CheckCollisionPointRec(GetMousePosition(), rec)) {
                     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
                         color = LIGHTGRAY;
@@ -262,6 +316,11 @@ int main(void) {
                 DrawTextureEx(addTexture, (Vector2){addX, addY}, 0, addScale, WHITE);
                 drawTasks();
 
+                //draw the delete button
+
+                //TODO: Draw delete boundary box
+
+
             } break;
             case CREATE_SCREEN: {
                 DrawTextureEx(backTexture, (Vector2){10, 10}, 0, backScale, WHITE);
@@ -277,10 +336,12 @@ int main(void) {
                 DrawRectangleRounded(saveBox, 0.5f, 0, CLITERAL(Color){ 47, 158, 0, 255 });
                 DrawTextEx(font, "SAVE", (Vector2){(saveBox.x + saveBox.width / 2) - saveBox.x,
                     saveBox.height / 4 + saveBox.y}, 24, 0, WHITE);
-
+                if(inputError){
+                    DrawTextEx(font, "Input a proper priority(LOW, MEDIUM, HIGH)", (Vector2){prioBox.x,prioBox.y + prioBox.height + 10}, 24, 0, RED);
+                }
                 if ((frames / 30) % 2 == 0) {
                     if (focus == 0) {
-                        DrawText("|", textBox.x + MeasureTextEx(font, textBoxInput, 24, 0).x, textBox.y + 8, 24, BLACK);
+                        DrawText("|", textBox.x + MeasureTextEx(font, textBoxInput, 24, 0).x + 8, textBox.y + 8, 24, BLACK);
 
                     } else if (focus == 1) {
                         DrawText("|", prioBox.x + MeasureTextEx(font, prioBoxInput, 24, 0).x + 8 , prioBox.y + 8, 24, BLACK);
@@ -294,6 +355,7 @@ int main(void) {
     }
     UnloadTexture(addTexture);
     UnloadTexture(backTexture);
+    UnloadTexture(deleteTexture);
     UnloadFont(font);
     CloseWindow();
     return 0;
