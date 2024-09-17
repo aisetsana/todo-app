@@ -35,7 +35,6 @@ typedef struct {
 
 
 static int tasks = 0;
-int negatives = 0;
 Font font;
 Font thinFont;
 
@@ -57,7 +56,6 @@ void addTask(const char *title, int priority, int id) {
 }
 
 void deleteTask(int id) {
-    negatives--;
     array[id].id = -1;
     
 }
@@ -67,7 +65,7 @@ void loadTasks() {
         addTask(loadTaskName(getLocation(), i, 1),         // name
                 strtol(loadTaskName(getLocation(), i, 2),  // prio
                        NULL, 10),
-                strtol(loadTaskName(getLocation() + negatives, i, 3), NULL, 10));  // id
+                strtol(loadTaskName(getLocation(), i, 3), NULL, 10));  // id
     }
 }
 int getPriority(char* prio) {
@@ -95,8 +93,10 @@ void drawTasks() {
     int fontSize = 20;
     int dropoff  = 0;
     int dX = WIDTH - 32  - 5;
-
+    int _i = 0; //placeholder int for index i for id
     for (int i = 0; i < tasks; i++) {
+        int id = strtol(loadTaskName(getLocation(), _i, 3), NULL, 10);
+
         Task task = getTask(i);
         bool deleted = false;
         int seconds = strtol(loadTaskName(getLocation(), i + 1, 4), NULL, 10);
@@ -108,8 +108,8 @@ void drawTasks() {
             dropoff -= 48;
             deleted = true;
         }
-
         if (!deleted) {
+            _i++;
 
             DrawCircle(x, y + MeasureTextEx(font, task.title, fontSize, 2).y / 2 , radius, circleColor[task.priority]);
             DrawTextEx(font, task.title, (Vector2){x + radius + offset, y - MeasureTextEx(font, task.title, fontSize, 2).y / 2}, fontSize, 2, RAYWHITE);
@@ -122,10 +122,13 @@ void drawTasks() {
 
             if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){dX, y, 32, 32})) {
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    printf("%d %d\n", id, _i);
+                    deleteLineFmFile(getLocation(), id);
                     deleteTask(i);
-                    // printf("%d\n", i);
+                    _i--;
                 }
             }
+
       }
     }
 }

@@ -9,7 +9,7 @@
 #include <unistd.h>
 #define MAX_SIZE 256
 
-char buffer[64];
+char buffer[MAX_SIZE];
 char* getLocation() {
     sprintf_s(buffer, MAX_SIZE, "%s\\%s", getenv("USERPROFILE"), "\\tasks.cfg");
     return buffer;
@@ -41,6 +41,7 @@ int getFileLines(char* loc) {
     return lines;
 }
 
+// Return type:  1: name, 2: priority, 3: ID, 4: timestamp; int line starts from 1 not 0 
 char* loadTaskName(char* loc, int line, int returnType) {
     FILE* file;
     if ((file = fopen(loc, "r")) == NULL) {
@@ -48,10 +49,11 @@ char* loadTaskName(char* loc, int line, int returnType) {
     }
     int count = 0;
     while (fgets(fileString, MAX_SIZE, file) != NULL) {
+                if (line == count) break;
+
         fileString[strcspn(fileString, "\n")] = 0;
         count++;
 
-        if (line == count) break;
     }
     char* input;
     char *name, *prio, *id, *timestamp;
@@ -127,4 +129,48 @@ void appendToCfg(char* name, int prio) {
     fprintf(file, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%d\n", name, _prio, id, (int)now);
 
     fclose(file);
+}
+
+void deleteLineFmFile(char* loc, int line) {
+    FILE *file, *tempFile;
+    char temp[256];
+    strcpy(temp, loc);
+    strcat(temp, ".temp");
+
+    char buffer[2048];
+    file = fopen(loc, "r");
+    tempFile = fopen(temp, "w");
+    if (file == NULL) {
+        perror("Could not open main file!\n");
+    } else if (tempFile == NULL) {
+        perror("Could not open temp file!\n");
+    }
+
+    bool keepReading = true;
+    int currentLine = 0;
+    char prios[3][8] = {"LOW", "MEDIUM", "HIGH"};
+
+    do {
+        fgets(buffer, 2048, file);
+        int id = strtol(loadTaskName(loc, currentLine , 3), NULL, 10);
+        int prio = strtol(loadTaskName(loc, currentLine,2), NULL, 10);
+        if (feof(file))
+            keepReading = false;
+        else {
+            if (currentLine != line) {
+                if(currentLine > line) id--;
+                fprintf(tempFile, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%d\n",
+                    loadTaskName(loc, currentLine,1),
+                    prios[prio],
+                    id,
+                    strtol(loadTaskName(loc, currentLine,4), NULL, 10));
+
+            }
+        }
+        currentLine++;
+    } while (keepReading);
+    fclose(file);
+    fclose(tempFile);
+    remove(loc);
+    rename(temp, loc);
 }
