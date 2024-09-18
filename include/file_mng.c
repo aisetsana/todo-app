@@ -41,7 +41,7 @@ int getFileLines(char* loc) {
     return lines;
 }
 
-// Return type:  1: name, 2: priority, 3: ID, 4: timestamp; int line starts from 1 not 0 
+// Return type:  1: name, 2: priority, 3: ID, 4: timestamp; int line starts from 1 not 0
 char* loadTaskName(char* loc, int line, int returnType) {
     FILE* file;
     if ((file = fopen(loc, "r")) == NULL) {
@@ -49,11 +49,10 @@ char* loadTaskName(char* loc, int line, int returnType) {
     }
     int count = 0;
     while (fgets(fileString, MAX_SIZE, file) != NULL) {
-                if (line == count) break;
+        if (line == count) break;
 
         fileString[strcspn(fileString, "\n")] = 0;
         count++;
-
     }
     char* input;
     char *name, *prio, *id, *timestamp;
@@ -95,12 +94,13 @@ char* loadTaskName(char* loc, int line, int returnType) {
             return "1";
         else if (strncmp(prio, "HIGH", 3) == 0)
             return "2";
-    } else if (returnType == 3)
+    } else if (returnType == 3) {
         return id;
-    else if (returnType == 4)
+    } else if (returnType == 4) {
         return timestamp;
-    else
+    } else {
         perror("Invalid return type");
+    }
 }
 
 bool fileExists(char* loc) {
@@ -109,10 +109,9 @@ bool fileExists(char* loc) {
 }
 void createFile() {
     if (!fileExists(getLocation())) {
-        FILE* file = fopen(getLocation(), "r");
+        FILE* file; 
 
-        file = fopen(getLocation(), "w");
-    } else {
+        file = fopen(getLocation(), "w"); //if file doesnt exist, create it
     }
 }
 void appendToCfg(char* name, int prio) {
@@ -152,19 +151,18 @@ void deleteLineFmFile(char* loc, int line) {
 
     do {
         fgets(buffer, 2048, file);
-        int id = strtol(loadTaskName(loc, currentLine , 3), NULL, 10);
-        int prio = strtol(loadTaskName(loc, currentLine,2), NULL, 10);
+        int id = strtol(loadTaskName(loc, currentLine, 3), NULL, 10);
+        int prio = strtol(loadTaskName(loc, currentLine, 2), NULL, 10);
         if (feof(file))
             keepReading = false;
         else {
             if (currentLine != line) {
-                if(currentLine > line) id--;
+                if (currentLine > line) id--;
                 fprintf(tempFile, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%d\n",
-                    loadTaskName(loc, currentLine,1),
-                    prios[prio],
-                    id,
-                    strtol(loadTaskName(loc, currentLine,4), NULL, 10));
-
+                        loadTaskName(loc, currentLine, 1),
+                        prios[prio],
+                        id,
+                        strtol(loadTaskName(loc, currentLine, 4), NULL, 10));
             }
         }
         currentLine++;

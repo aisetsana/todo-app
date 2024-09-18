@@ -1,0 +1,25 @@
+MAINICON ICON "resources/icons/icon.ico"
+
+1 VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    //BLOCK "080904E4"  // English UK
+    BLOCK "040904E4"    // English US
+    BEGIN
+      VALUE "FileDescription", "An app to manage your tasks!"
+      VALUE "FileVersion", "1.0.0"
+      VALUE "InternalName", "todomate"
+      VALUE "LegalCopyright", "(c) 2024 karroch37"
+      VALUE "ProductName", "todomate"
+      VALUE "ProductVersion", "1.0.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    //VALUE "Translation", 0x809, 1252  // English UK
+    VALUE "Translation", 0x409, 1252    // English US
+  END
+END
