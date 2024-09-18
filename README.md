@@ -1,2 +1,10 @@
-# Note
-For a quicksetup for setup raylib [this youtube video](https://www.youtube.com/watch?v=HPDLTQ4J_zQ) is a good start
+# Todomate
+Just a simple and small task managment app, includes barebone features made mainly as getting comfortable around [raylib](https://github.com/raysan5/raylib).
+
+# Usage
+**(Note that this app is made purely for Windows experience)**
+* Clone the repository.
+* Include raylib lib
+* Compile and run using the *run.bat* file (May need to compile the rc file to get an icon!)
+* win
+
