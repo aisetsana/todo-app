@@ -110,7 +110,7 @@ void drawTasks() {
             DrawCircle(x, y + MeasureTextEx(font, task.title, fontSize, 2).y / 2, radius, circleColor[task.priority]);
             DrawTextEx(font, task.title, (Vector2){x + radius + offset, y - MeasureTextEx(font, task.title, fontSize, 2).y / 2}, fontSize, 2, RAYWHITE);
             DrawTextEx(thinFont,
-                       TextFormat("%d-%02d-%02d %02d:%02d:%02d", time->tm_year + 1900, time->tm_mon, time->tm_mday,
+                       TextFormat("%d-%02d-%02d %02d:%02d:%02d", time->tm_year + 1900, time->tm_mon + 1, time->tm_mday,
                                   time->tm_hour, time->tm_min, time->tm_sec),
                        (Vector2){x + radius + offset, y + MeasureTextEx(font, task.title, fontSize, 2).y / 2}, fontSize - 2, 2, RAYWHITE);
             DrawTextureEx(deleteTexture, (Vector2){dX, y}, 0, 1, WHITE);
@@ -140,7 +140,7 @@ int main(void) {
     Image addButton = LoadImage("resources\\icons\\add.png");  // load into cpu
     Image backImage = LoadImage("resources\\icons\\back.png");
     Image deleteButton = LoadImage("resources\\icons\\del.png");
-    Image icon = LoadImage("resources\\icons\\icon.png"); //shitty image I made but it'll do for now
+    Image icon = LoadImage("resources\\icons\\icon.png");  // shitty image I made but it'll do for now
     SetWindowIcon(icon);
     UnloadImage(icon);
     Texture2D addTexture = LoadTextureFromImage(addButton);  // load into gpu
@@ -192,7 +192,7 @@ int main(void) {
     Rectangle textBox = {
         .x = 25,
         .y = 10 + 32 + padding,
-        .width = 250,
+        .width = 480,
         .height = 40,
     };
     Rectangle prioBox = {
@@ -213,6 +213,8 @@ int main(void) {
     while (!WindowShouldClose()) {
         switch (currentScreen) {
             case MAIN_SCREEN: {
+                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+
                 if (CheckCollisionPointRec(GetMousePosition(), add)) {
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         currentScreen = CREATE_SCREEN;
