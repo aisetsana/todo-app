@@ -1,4 +1,6 @@
-/* Made by karroch37 on 9/15/2024 */
+/* Made by aisetsana on 9/15/2024 */
+
+#include "file_mng.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -109,9 +111,9 @@ bool fileExists(char* loc) {
 }
 void createFile() {
     if (!fileExists(getLocation())) {
-        FILE* file; 
+        FILE* file;
 
-        file = fopen(getLocation(), "w"); //if file doesnt exist, create it
+        file = fopen(getLocation(), "w");  // if file doesnt exist, create it
     }
 }
 void appendToCfg(char* name, int prio) {
@@ -128,6 +130,78 @@ void appendToCfg(char* name, int prio) {
     fprintf(file, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%d\n", name, _prio, id, (int)now);
 
     fclose(file);
+}
+
+// A super shitty way to swap which its the same as deleting a line except it... doesn't delete a line
+void swapDown(int line) {
+    FILE *file, *tempFile;
+    char temp[256];
+    char* loc = getLocation();
+    strcpy(temp, loc);
+    strcat(temp, ".temp");
+
+    char buffer[2048];
+    file = fopen(loc, "r");
+    tempFile = fopen(temp, "w");
+    if (file == NULL) {
+        perror("Could not open main file!\n");
+    } else if (tempFile == NULL) {
+        perror("Could not open temp file!\n");
+    }
+
+    char _l1[256], _l2[256];
+    bool keepReading = true;
+    int currentLine = 0;
+    char prios[3][8] = {"LOW", "MEDIUM", "HIGH"};
+    bool linehit = false;
+
+    char nLine[256], pLine[256];  // next line and prev line respectively
+
+    do {
+        fgets(buffer, 2048, file);
+        int id = strtol(loadTaskName(loc, currentLine, 3), NULL, 10);
+        int prio = strtol(loadTaskName(loc, currentLine, 2), NULL, 10);
+        if (feof(file))
+            keepReading = false;
+        else {
+            if (currentLine != line) {
+                if (linehit) {  // swap w prev line
+                    snprintf(pLine, 256, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%d",
+                             loadTaskName(loc, currentLine - 1, 1),
+                             prios[prio],
+                             currentLine,
+                             strtol(loadTaskName(loc, currentLine - 1, 4), NULL, 10));
+                    fprintf(tempFile, "%s\n", pLine);
+                    linehit = false;
+                } else {
+                    // if (currentLine > line) id--;
+                    fprintf(tempFile, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%d\n",
+                            loadTaskName(loc, currentLine, 1),
+                            prios[prio],
+                            id,
+                            strtol(loadTaskName(loc, currentLine, 4), NULL, 10));
+                }
+            } else {  // swap w next line
+                linehit = true;
+                snprintf(nLine, 256, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%d",
+                         loadTaskName(loc, currentLine + 1, 1),
+                         prios[prio],
+                         currentLine,
+                         strtol(loadTaskName(loc, currentLine + 1, 4), NULL, 10));
+                // strcpy(nLine, loadTaskName(loc, currentLine + 1, 1));
+                fprintf(tempFile, "%s\n", nLine);
+                //  linehit = false;
+            }
+        }
+        currentLine++;
+    } while (keepReading);
+    fclose(file);
+    fclose(tempFile);
+    remove(loc);
+    rename(temp, loc);
+}
+
+void swapUp(int line) {
 }
 
 void deleteLineFmFile(char* loc, int line) {

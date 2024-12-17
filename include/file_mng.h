@@ -2,7 +2,9 @@
 #define FILE_MNG_H
 #define MAX_SIZE 256
 
-extern char buffer[64];
+#include <stdbool.h>
+
+extern char buffer[MAX_SIZE];
 extern char fileString[MAX_SIZE];
 
 char* getLocation();
@@ -12,5 +14,7 @@ char* loadTaskName(char* loc, int line, int returnType);
 bool fileExists(char* loc);
 void createFile();
 void appendToCfg(char* name, int prio);
+void swapDown(int line);
+void swapUp(int line);
 void deleteLineFmFile(char* loc, int line);
 #endif

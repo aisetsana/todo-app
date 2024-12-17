@@ -9,6 +9,8 @@
 #include "../include/file_mng.h"
 #include "../include/raylib.h"
 
+// TODO: add a scrollbar, add up and down buttons to sort stuff
+
 #define WIDTH 1045
 #define HEIGHT 596
 #define BACKGROUND_COLOR \
@@ -57,6 +59,21 @@ void deleteTask(int id) {
     array[id].id = -1;
 }
 
+void reloadTasks() {
+    // delete all tasks
+    for (int i = 0; i < tasks; i++) {
+        deleteTask(i);  // id
+    }
+
+    // re-add the tasks
+    for (int i = 0; i < getFileLines(getLocation()); i++) {
+        array[i].title = loadTaskName(getLocation(), i, 1);            // name
+        array[i].priority = strtol(loadTaskName(getLocation(), i, 2),  // prio
+                                   NULL, 10);
+        array[i].id = strtol(loadTaskName(getLocation(), i, 3), NULL, 10);
+    }
+}
+
 void loadTasks() {
     for (int i = 0; i < getFileLines(getLocation()); i++) {
         addTask(loadTaskName(getLocation(), i, 1),         // name
@@ -80,7 +97,7 @@ void drawTextWithShadow(Font font, const char *title, Vector2 position, int font
     DrawTextEx(font, title, position, fontSize, spacing, color);
 }
 
-Texture deleteTexture;
+Texture deleteTexture, tup, tdown;
 void drawTasks() {
     Color circleColor[3] = {GREEN, YELLOW, RED};
 
@@ -89,8 +106,9 @@ void drawTasks() {
     int offset = 15;
     int fontSize = 20;
     int dropoff = 0;
-    int dX = WIDTH - 32 - 5;
-    int _i = 0;  // placeholder int for index i for id
+    int dX = WIDTH - 32 - 5;  // delete texture X
+    int uX = dX - 32 - 5;     // up and down texture X
+    int _i = 0;               // placeholder int for index i for id
     for (int i = 0; i < tasks; i++) {
         int id = strtol(loadTaskName(getLocation(), _i, 3), NULL, 10);
 
@@ -116,12 +134,47 @@ void drawTasks() {
             DrawTextureEx(deleteTexture, (Vector2){dX, y}, 0, 1, WHITE);
             DrawRectangleLines(dX, y, 32, 32, WHITE);
 
-            if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){dX, y, 32, 32})) {
+            DrawTextureEx(tup, (Vector2){uX + (16 * 0.1), y}, 0, 0.9, WHITE);
+            DrawTextureEx(tdown, (Vector2){uX + (16 * 0.1), y + 16}, 0, 0.9, WHITE);
+            DrawRectangleLines(uX, y, 32, 15, WHITE);
+            DrawRectangleLines(uX, y + 16 + 1, 32, 15, WHITE);
+
+            if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){dX, y, 32, 32})) {  // check if delete button was clicked
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     printf("\033[1;31mDeleted task: \033[0m%s\n", task.title);
                     deleteLineFmFile(getLocation(), id);
                     deleteTask(i);
                     _i--;
+                }
+            }
+            // collission for up button
+            // if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){uX, y, 32, 16})) {
+            //     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            //         printf("\033[1;31mMoved task: \033[0m%s up\n", task.title);
+            //         deleteLineFmFile(getLocation(), id);
+            //         deleteTask(i);
+            //         _i--;
+            //         appendToCfg(task.title, task.priority);
+            //         // addTask(loadTaskName(getLocation(), i - 2, 1), strtol(loadTaskName(getLocation(), i - 2, 2), NULL, 10), i - 2);
+            //         printf("%d\n", i);
+            //     }
+            // }
+
+            // collission for down button
+            if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){uX, y + 16, 32, 16})) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    printf("\033[1;31mMoved task: \033[0m%s down\n", task.title);
+                    // deleteLineFmFile(getLocation(), id);
+                    // deleteTask(i);
+                    // _i--;
+                    // appendToCfg(task.title, task.priority);
+                    // addTask(loadTaskName(getLocation(), i + 2, 1), strtol(loadTaskName(getLocation(), i + 2, 2), NULL, 10), i + 2);
+                    // printf("%d\n", i);
+
+                    // deleteLineFmFile(getLocation(), id);
+                    // appendToCfg(task.title, task.priority);
+                    swapDown(id);
+                    reloadTasks();
                 }
             }
         }
@@ -141,14 +194,20 @@ int main(void) {
     Image backImage = LoadImage("resources\\icons\\back.png");
     Image deleteButton = LoadImage("resources\\icons\\del.png");
     Image icon = LoadImage("resources\\icons\\icon.png");  // shitty image I made but it'll do for now
+    Image up = LoadImage("resources\\icons\\up.png");
+    Image down = LoadImage("resources\\icons\\down.png");
     SetWindowIcon(icon);
     UnloadImage(icon);
     Texture2D addTexture = LoadTextureFromImage(addButton);  // load into gpu
     Texture2D backTexture = LoadTextureFromImage(backImage);
     deleteTexture = LoadTextureFromImage(deleteButton);
+    tup = LoadTextureFromImage(up);
+    tdown = LoadTextureFromImage(down);
     UnloadImage(addButton);  // unload from cpu
     UnloadImage(backImage);
     UnloadImage(deleteButton);
+    UnloadImage(up);
+    UnloadImage(down);
 
     Screen currentScreen = MAIN_SCREEN;
 
@@ -220,6 +279,7 @@ int main(void) {
                         currentScreen = CREATE_SCREEN;
                     }
                 }
+
             } break;
             case CREATE_SCREEN: {
                 if (IsKeyPressed(KEY_ESCAPE)) currentScreen = MAIN_SCREEN;
@@ -385,6 +445,8 @@ int main(void) {
     UnloadTexture(addTexture);
     UnloadTexture(backTexture);
     UnloadTexture(deleteTexture);
+    UnloadTexture(tup);
+    UnloadTexture(tdown);
     UnloadFont(font);
     CloseWindow();
     return 0;
