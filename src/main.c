@@ -148,32 +148,21 @@ void drawTasks() {
                 }
             }
             // collission for up button
-            // if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){uX, y, 32, 16})) {
-            //     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            //         printf("\033[1;31mMoved task: \033[0m%s up\n", task.title);
-            //         deleteLineFmFile(getLocation(), id);
-            //         deleteTask(i);
-            //         _i--;
-            //         appendToCfg(task.title, task.priority);
-            //         // addTask(loadTaskName(getLocation(), i - 2, 1), strtol(loadTaskName(getLocation(), i - 2, 2), NULL, 10), i - 2);
-            //         printf("%d\n", i);
-            //     }
-            // }
+            if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){uX, y, 32, 16})) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    printf("\033[1;31mMoved task: \033[0m%s up\n", task.title);
+
+                    swap(id, -1);
+                    reloadTasks();
+                }
+            }
 
             // collission for down button
             if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){uX, y + 16, 32, 16})) {
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     printf("\033[1;31mMoved task: \033[0m%s down\n", task.title);
-                    // deleteLineFmFile(getLocation(), id);
-                    // deleteTask(i);
-                    // _i--;
-                    // appendToCfg(task.title, task.priority);
-                    // addTask(loadTaskName(getLocation(), i + 2, 1), strtol(loadTaskName(getLocation(), i + 2, 2), NULL, 10), i + 2);
-                    // printf("%d\n", i);
 
-                    // deleteLineFmFile(getLocation(), id);
-                    // appendToCfg(task.title, task.priority);
-                    swapDown(id);
+                    swap(id, 0);
                     reloadTasks();
                 }
             }
@@ -354,6 +343,7 @@ int main(void) {
                         addTask(loadTaskName(getLocation(), getFileLines(getLocation()), 1),
                                 strtol(loadTaskName(getLocation(), getFileLines(getLocation()), 2), NULL, 10),
                                 getFileLines(getLocation()) - 1);
+                        reloadTasks();
                         printf("\033[1;32mCreated task: \033[0m%s\n",
                                loadTaskName(getLocation(), getFileLines(getLocation()), 1));
 
@@ -376,7 +366,7 @@ int main(void) {
                                     getFileLines(getLocation()) - 1);
                             printf("\033[1;32mCreated task: \033[0m%s\n",
                                    loadTaskName(getLocation(), getFileLines(getLocation()), 1));
-
+                            reloadTasks();
                             if (inputError) {
                                 inputError = false;
                             }

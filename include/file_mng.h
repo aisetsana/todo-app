@@ -14,7 +14,6 @@ char* loadTaskName(char* loc, int line, int returnType);
 bool fileExists(char* loc);
 void createFile();
 void appendToCfg(char* name, int prio);
-void swapDown(int line);
-void swapUp(int line);
+void swap(int line, int direction);
 void deleteLineFmFile(char* loc, int line);
 #endif
