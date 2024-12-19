@@ -306,7 +306,7 @@ int main(void) {
 
                     DrawAlert(WIDTH / 2 - 512 / 2, HEIGHT - 140, 512, 50, "Tasks have been reloaded!");  // 140 is just a feelsgood number
                     if (timeSpent / CLOCKS_PER_SEC >= 3.0) {                                             // how much time to display the alert for
-                        begin = clock();
+                        begin = clock();                                                                 // reset clock
                         pressed = false;
                     }
                 }
