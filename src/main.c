@@ -15,6 +15,8 @@
 #define HEIGHT 596
 #define BACKGROUND_COLOR \
     CLITERAL(Color) { 30, 30, 30, 255 }
+#define BOX_COLOR \
+    CLITERAL(Color) { 20, 20, 20, 255 }
 #define FONT_SIZE 36
 
 typedef enum Priority {
@@ -26,6 +28,7 @@ typedef enum Priority {
 typedef enum Screen {
     MAIN_SCREEN,
     CREATE_SCREEN,
+    EDIT_SCREEN,
 } Screen;
 
 typedef struct {
@@ -97,7 +100,17 @@ void drawTextWithShadow(Font font, const char *title, Vector2 position, int font
     DrawTextEx(font, title, position, fontSize, spacing, color);
 }
 
-Texture deleteTexture, tup, tdown;
+void DrawAlert(int posX, int posY, int width, int height, char *text) {
+    Rectangle rec = {.x = posX, .y = posY, .height = height, .width = width};
+    Rectangle shadowRec = {.x = posX - 5, .y = posY - 2, .height = height, .width = width};
+    int fontSize = 26;
+    Vector2 textSize = MeasureTextEx(font, text, fontSize, 0.2);
+    DrawRectangleRounded(shadowRec, 0.5, 0, CLITERAL(Color){0, 0, 0, 35});
+    DrawRectangleRounded(rec, 0.5, 0, BOX_COLOR);
+    DrawTextEx(font, text, (Vector2){posX + width / 2 - textSize.x / 2, posY + (height / 2) - textSize.y / 2}, fontSize, 0.2, WHITE);
+}
+
+Texture deleteTexture, tup, tdown, tedit;
 void drawTasks() {
     Color circleColor[3] = {GREEN, YELLOW, RED};
 
@@ -108,6 +121,7 @@ void drawTasks() {
     int dropoff = 0;
     int dX = WIDTH - 32 - 5;  // delete texture X
     int uX = dX - 32 - 5;     // up and down texture X
+    int eX = uX - 32 - 5;     // edit texture X
     int _i = 0;               // placeholder int for index i for id
     for (int i = 0; i < tasks; i++) {
         int id = strtol(loadTaskName(getLocation(), _i, 3), NULL, 10);
@@ -147,10 +161,19 @@ void drawTasks() {
                     _i--;
                 }
             }
+
+            // Only draw the edit texture when hovering
+            if (GetMousePosition().y > 96 + (48 * i) && GetMousePosition().y < 96 + (48 * (i + 1))) {
+                DrawTextureEx(tedit, (Vector2){eX, y}, 0, 0.2, WHITE);
+                if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){eX, y, 128, 128}))
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    }
+            }
+
             // collission for up button
             if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){uX, y, 32, 16})) {
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    printf("\033[1;31mMoved task: \033[0m%s up\n", task.title);
+                    printf("\033[1;31mMoved task: \033[0m%s \033[1;31mup\033[0m\n", task.title);
 
                     swap(id, -1);
                     reloadTasks();
@@ -160,7 +183,7 @@ void drawTasks() {
             // collission for down button
             if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){uX, y + 16, 32, 16})) {
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    printf("\033[1;31mMoved task: \033[0m%s down\n", task.title);
+                    printf("\033[1;31mMoved task: \033[0m%s \033[1;31mdown\033[0m\n", task.title);
 
                     swap(id, 0);
                     reloadTasks();
@@ -185,6 +208,7 @@ int main(void) {
     Image icon = LoadImage("resources\\icons\\icon.png");  // shitty image I made but it'll do for now
     Image up = LoadImage("resources\\icons\\up.png");
     Image down = LoadImage("resources\\icons\\down.png");
+    Image edit = LoadImage("resources\\icons\\edit.png");
     SetWindowIcon(icon);
     UnloadImage(icon);
     Texture2D addTexture = LoadTextureFromImage(addButton);  // load into gpu
@@ -192,11 +216,13 @@ int main(void) {
     deleteTexture = LoadTextureFromImage(deleteButton);
     tup = LoadTextureFromImage(up);
     tdown = LoadTextureFromImage(down);
+    tedit = LoadTextureFromImage(edit);
     UnloadImage(addButton);  // unload from cpu
     UnloadImage(backImage);
     UnloadImage(deleteButton);
     UnloadImage(up);
     UnloadImage(down);
+    UnloadImage(edit);
 
     Screen currentScreen = MAIN_SCREEN;
 
@@ -256,6 +282,9 @@ int main(void) {
         .height = 50,
     };
     int frames = 0;
+    bool pressed = false;
+    clock_t begin = clock();
+    double timeSpent = 0.0;
     SetTargetFPS(60);
     SetExitKey(0);  // set to NULL so it doesn't exit by pressing ESCAPE
     while (!WindowShouldClose()) {
@@ -268,7 +297,19 @@ int main(void) {
                         currentScreen = CREATE_SCREEN;
                     }
                 }
+                if (IsKeyPressed(KEY_R)) {
+                    reloadTasks();
+                    pressed = true;
+                }
+                if (pressed) {
+                    timeSpent = (double)(clock() - begin);
 
+                    DrawAlert(WIDTH / 2 - 512 / 2, HEIGHT - 140, 512, 50, "Tasks have been reloaded!");  // 140 is just a feelsgood number
+                    if (timeSpent / CLOCKS_PER_SEC >= 3.0) {                                             // how much time to display the alert for
+                        begin = clock();
+                        pressed = false;
+                    }
+                }
             } break;
             case CREATE_SCREEN: {
                 if (IsKeyPressed(KEY_ESCAPE)) currentScreen = MAIN_SCREEN;
@@ -437,6 +478,7 @@ int main(void) {
     UnloadTexture(deleteTexture);
     UnloadTexture(tup);
     UnloadTexture(tdown);
+    UnloadTexture(tedit);
     UnloadFont(font);
     CloseWindow();
     return 0;
