@@ -15,5 +15,8 @@ bool fileExists(char* loc);
 void createFile();
 void appendToCfg(char* name, int prio);
 void swap(int line, int direction);
+void edit(int line, int index, char* input);
+void editName(int line, char* input);
+void editPriority(int line, char* input);
 void deleteLineFmFile(char* loc, int line);
 #endif

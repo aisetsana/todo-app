@@ -169,7 +169,7 @@ void swap(int line, int direction) {
         else {
             if (currentLine != line) {
                 if (linehit) {  // swap w prev line
-                    snprintf(pLine, 256, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%d",
+                    snprintf(pLine, 256, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%ld",
                              loadTaskName(loc, currentLine - 1, 1),
                              prios[strtol(loadTaskName(loc, currentLine - 1, 2), NULL, 10)],
                              currentLine,
@@ -177,7 +177,7 @@ void swap(int line, int direction) {
                     fprintf(tempFile, "%s\n", pLine);
                     linehit = false;
                 } else {
-                    fprintf(tempFile, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%d\n",
+                    fprintf(tempFile, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%ld\n",
                             loadTaskName(loc, currentLine, 1),
                             prios[strtol(loadTaskName(loc, currentLine, 2), NULL, 10)],
                             currentLine,
@@ -185,7 +185,7 @@ void swap(int line, int direction) {
                 }
             } else {  // swap w next line
                 linehit = true;
-                snprintf(nLine, 256, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%d",
+                snprintf(nLine, 256, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%ld",
                          loadTaskName(loc, currentLine + (1), 1),
                          prios[strtol(loadTaskName(loc, currentLine + 1, 2), NULL, 10)],
                          currentLine,
@@ -199,6 +199,84 @@ void swap(int line, int direction) {
     fclose(tempFile);
     remove(loc);
     rename(temp, loc);
+}
+
+void edit(int line, int index, char* input) {
+    FILE *file, *tempFile;
+    char temp[256];
+    char* loc = getLocation();
+    strcpy(temp, loc);
+    strcat(temp, ".temp");
+
+    char buffer[2048];
+    file = fopen(loc, "r");
+    tempFile = fopen(temp, "w");
+    if (file == NULL) {
+        perror("Could not open main file!\n");
+    } else if (tempFile == NULL) {
+        perror("Could not open temp file!\n");
+    } else if (index != 0 && index != 1) {
+        perror("Index can only be either 0 or 1!\n");
+    }
+
+    bool keepReading = true;
+    int currentLine = 0;
+    char prios[3][8] = {"LOW", "MEDIUM", "HIGH"};
+    bool linehit = false;
+
+    do {
+        fgets(buffer, 2048, file);
+        int id = strtol(loadTaskName(loc, currentLine, 3), NULL, 10);
+        long prio = strtol(loadTaskName(loc, currentLine, 2), NULL, 10);
+        if (feof(file))
+            keepReading = false;
+        else {
+            if (currentLine == line) {
+                if (index == 0) {  // if index is 0, we're editing the name value
+                    fprintf(tempFile, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%ld\n",
+                            input,
+                            prios[prio],
+                            id,
+                            strtol(loadTaskName(loc, currentLine, 4), NULL, 10));
+                } else if (index == 1) {  // if index is 1, we're editing the prio value
+                    if (strncmp(input, "LOW", 3) == 0)
+                        prio = 0;
+                    else if (strncmp(input, "MED", 3) == 0)
+                        prio = 1;
+                    else if (strncmp(input, "HIGH", 3) == 0)
+                        prio = 2;
+                    else
+                        prio = 0;
+
+                    fprintf(tempFile, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%ld\n",
+                            loadTaskName(loc, currentLine, 1),
+                            prios[prio],
+                            id,
+                            strtol(loadTaskName(loc, currentLine, 4), NULL, 10));
+                }
+            } else {
+                fprintf(tempFile, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%ld\n",
+                        loadTaskName(loc, currentLine, 1),
+                        prios[prio],
+                        id,
+                        strtol(loadTaskName(loc, currentLine, 4), NULL, 10));
+            }
+        }
+        currentLine++;
+    } while (keepReading);
+    fclose(file);
+    fclose(tempFile);
+    remove(loc);
+    rename(temp, loc);
+}
+
+// edit a specific line in the config file; index is two values 0 for editing the name, 1 for editing the priority
+void editName(int line, char* input) {
+    edit(line, 0, input);
+}
+
+void editPriority(int line, char* input) {
+    edit(line, 1, input);
 }
 
 void deleteLineFmFile(char* loc, int line) {
@@ -229,7 +307,7 @@ void deleteLineFmFile(char* loc, int line) {
         else {
             if (currentLine != line) {
                 if (currentLine > line) id--;
-                fprintf(tempFile, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%d\n",
+                fprintf(tempFile, "NAME=%s,PRIORITY=%s,ID=%d,TIMESTAMP=%ld\n",
                         loadTaskName(loc, currentLine, 1),
                         prios[prio],
                         id,

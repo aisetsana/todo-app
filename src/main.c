@@ -38,6 +38,7 @@ typedef struct {
 
 } Task;
 
+Screen currentScreen = MAIN_SCREEN;
 static int tasks = 0;
 Font font;
 Font thinFont;
@@ -85,6 +86,20 @@ void loadTasks() {
                 strtol(loadTaskName(getLocation(), i, 3), NULL, 10));  // id
     }
 }
+
+Task getHoveredTask() {
+    Task task = {0};
+    task.id = -1;  // to setup for if the task exists checks, just check if the task id is -1
+    if (currentScreen == MAIN_SCREEN) {
+        for (int i = 0; i < tasks; i++) {
+            if (GetMousePosition().y > 96 + (48 * i) && GetMousePosition().y < 96 + (48 * (i + 1))) {
+                task = getTask(i);
+            }
+        }
+    }
+    return task;
+}
+
 int getPriority(char *prio) {
     if (strcmp(prio, "LOW") == 0)
         return 0;
@@ -165,13 +180,19 @@ void drawTasks() {
             // Only draw the edit texture when hovering
             if (GetMousePosition().y > 96 + (48 * i) && GetMousePosition().y < 96 + (48 * (i + 1))) {
                 DrawTextureEx(tedit, (Vector2){eX, y}, 0, 0.2, WHITE);
-                if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){eX, y, 128, 128}))
+                if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){eX, y, 32, 32}))
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                        currentScreen = EDIT_SCREEN;
                     }
+
+                DrawRectangle(0,
+                              y - MeasureTextEx(font, task.title, fontSize, 2).y / 2 - 3,
+                              WIDTH, 48,
+                              CLITERAL(Color){255, 255, 255, 10});  // Draw hover rec, y value is minused to start from text Y
             }
 
             // collission for up button
-            if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){uX, y, 32, 16})) {
+            if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){uX, y, 32, 16})) {  // can't use getHoveredTask() cause of a bug and i cant bother to fix it
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     printf("\033[1;31mMoved task: \033[0m%s \033[1;31mup\033[0m\n", task.title);
 
@@ -224,8 +245,6 @@ int main(void) {
     UnloadImage(down);
     UnloadImage(edit);
 
-    Screen currentScreen = MAIN_SCREEN;
-
     Color color = RAYWHITE;
     loadTasks();
 
@@ -234,10 +253,16 @@ int main(void) {
     bool mouseOnText = false;
     int textBoxLetterCount = 0;
     int prioBoxLetterCount = 0;
+    int hoveredTextC = 0;
+    int hoveredPrioC = 0;
+    int hoveredTaskID;
     int padding = 64;
 
     char textBoxInput[32] = "\0";
     char prioBoxInput[32] = "\0";
+
+    char hoveredText[32] = "\0";
+    char hoveredPrio[32] = "\0";
 
     float addScale = 1.5f;
     float backScale = 0.1f;
@@ -246,6 +271,8 @@ int main(void) {
     int width = MeasureTextEx(font, title, FONT_SIZE, 2).x;
     int height = MeasureTextEx(font, title, FONT_SIZE, 2).y;
     int focus = 0;  // which input box to put focus and typing cursor on, 0 is name box by default
+
+    char prios[3][8] = {"LOW", "MEDIUM", "HIGH"};
 
     bool inputError = false;
     Rectangle rec = {
@@ -292,18 +319,25 @@ int main(void) {
             case MAIN_SCREEN: {
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
 
+                hoveredTaskID = getHoveredTask().id;
+                snprintf(hoveredText, 32, getHoveredTask().title);
+                snprintf(hoveredPrio, 32, prios[getHoveredTask().priority]);
+                hoveredTextC = strlen(hoveredText);
+                hoveredPrioC = strlen(hoveredPrio);
+
                 if (CheckCollisionPointRec(GetMousePosition(), add)) {
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         currentScreen = CREATE_SCREEN;
                     }
                 }
                 if (IsKeyPressed(KEY_R)) {
+                    printf("Reloaded tasks\n");
+
                     reloadTasks();
                     pressed = true;
                 }
                 if (pressed) {
                     timeSpent = (double)(clock() - begin);
-
                     DrawAlert(WIDTH / 2 - 512 / 2, HEIGHT - 140, 512, 50, "Tasks have been reloaded!");  // 140 is just a feelsgood number
                     if (timeSpent / CLOCKS_PER_SEC >= 3.0) {                                             // how much time to display the alert for
                         begin = clock();                                                                 // reset clock
@@ -312,12 +346,12 @@ int main(void) {
                 }
             } break;
             case CREATE_SCREEN: {
-                if (IsKeyPressed(KEY_ESCAPE)) currentScreen = MAIN_SCREEN;
+                if ((CheckCollisionPointRec(GetMousePosition(), backButton) &&
+                     IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) ||
+                    IsKeyPressed(KEY_ESCAPE)) {
+                    focus = 0;
 
-                if (CheckCollisionPointRec(GetMousePosition(), backButton)) {
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                        currentScreen = MAIN_SCREEN;
-                    }
+                    currentScreen = MAIN_SCREEN;
                 }
 
                 if (CheckCollisionPointRec(GetMousePosition(), textBox) || CheckCollisionPointRec(GetMousePosition(), prioBox))
@@ -376,7 +410,9 @@ int main(void) {
                     }
                 }
 
-                if (IsKeyPressed(KEY_ENTER)) {
+                if (IsKeyPressed(KEY_ENTER) ||
+                    (CheckCollisionPointRec(GetMousePosition(), saveBox) &&
+                     IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
                     strcpy(prioBoxInput, TextToUpper(prioBoxInput));
                     if (strcmp(prioBoxInput, "LOW") == 0 || strcmp(prioBoxInput, "MEDIUM") == 0 || strcmp(prioBoxInput, "HIGH") == 0) {
                         currentScreen = MAIN_SCREEN;
@@ -387,7 +423,7 @@ int main(void) {
                         reloadTasks();
                         printf("\033[1;32mCreated task: \033[0m%s\n",
                                loadTaskName(getLocation(), getFileLines(getLocation()), 1));
-
+                        focus = 0;
                         if (inputError) {
                             inputError = false;
                         }
@@ -396,25 +432,91 @@ int main(void) {
                         inputError = true;
                     }
                 }
-                if (CheckCollisionPointRec(GetMousePosition(), saveBox)) {
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                        strcpy(prioBoxInput, TextToUpper(prioBoxInput));
-                        if (strcmp(prioBoxInput, "LOW") == 0 || strcmp(prioBoxInput, "MEDIUM") == 0 || strcmp(prioBoxInput, "HIGH") == 0) {
-                            currentScreen = MAIN_SCREEN;
-                            appendToCfg(textBoxInput, getPriority(prioBoxInput));
-                            addTask(loadTaskName(getLocation(), getFileLines(getLocation()), 1),
-                                    strtol(loadTaskName(getLocation(), getFileLines(getLocation()), 2), NULL, 10),
-                                    getFileLines(getLocation()) - 1);
-                            printf("\033[1;32mCreated task: \033[0m%s\n",
-                                   loadTaskName(getLocation(), getFileLines(getLocation()), 1));
-                            reloadTasks();
-                            if (inputError) {
-                                inputError = false;
-                            }
 
-                        } else {
-                            inputError = true;
+            } break;
+            case EDIT_SCREEN: {
+                if ((CheckCollisionPointRec(GetMousePosition(), backButton) &&
+                     IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) ||
+                    IsKeyPressed(KEY_ESCAPE)) {
+                    focus = 0;
+
+                    currentScreen = MAIN_SCREEN;
+                }
+
+                if (CheckCollisionPointRec(GetMousePosition(), textBox) || CheckCollisionPointRec(GetMousePosition(), prioBox))
+                    mouseOnText = true;
+                else
+                    mouseOnText = false;
+                if (mouseOnText) {
+                    SetMouseCursor(MOUSE_CURSOR_IBEAM);
+                } else
+                    SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+                if (IsKeyPressed(KEY_TAB)) {
+                    if (focus == 0)
+                        focus = 1;
+                    else if (focus == 1)
+                        focus = 0;
+                }
+                if (CheckCollisionPointRec(GetMousePosition(), textBox)) {
+                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                        focus = 0;
+                    }
+                }
+
+                if (CheckCollisionPointRec(GetMousePosition(), prioBox)) {
+                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                        focus = 1;
+                    }
+                }
+
+                int key = GetCharPressed();
+                while (key > 0) {
+                    if (focus == 0) {
+                        if (key >= 32 && key <= 125 && hoveredTextC <= 32) {
+                            hoveredText[hoveredTextC] = (char)key;
+                            hoveredText[hoveredTextC + 1] = 0;  // null terminate
+                            hoveredTextC++;
                         }
+                    } else if (focus == 1) {
+                        if (key >= 32 && key <= 125 && hoveredPrioC <= 32) {
+                            hoveredPrio[hoveredPrioC] = (char)key;
+                            hoveredPrio[hoveredPrioC + 1] = 0;  // null terminate
+                            hoveredPrioC++;
+                        }
+                    }
+                    key = GetCharPressed();
+                }
+
+                if (IsKeyPressed(KEY_BACKSPACE)) {
+                    if (focus == 0) {
+                        hoveredTextC--;
+                        if (hoveredTextC < 0) hoveredTextC = 0;
+                        hoveredText[hoveredTextC] = 0;
+                    } else if (focus == 1) {
+                        hoveredPrioC--;
+                        if (hoveredPrioC < 0) hoveredPrioC = 0;
+                        hoveredPrio[hoveredPrioC] = 0;
+                    }
+                }
+
+                if (IsKeyPressed(KEY_ENTER) ||
+                    (CheckCollisionPointRec(GetMousePosition(), saveBox) &&
+                     IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
+                    strcpy(hoveredPrio, TextToUpper(hoveredPrio));
+                    if (strcmp(hoveredPrio, "LOW") == 0 || strcmp(hoveredPrio, "MEDIUM") == 0 || strcmp(hoveredPrio, "HIGH") == 0) {
+                        currentScreen = MAIN_SCREEN;
+                        editName(hoveredTaskID, hoveredText);
+                        editPriority(hoveredTaskID, hoveredPrio);
+                        reloadTasks();
+                        printf("\033[1;33mEdited task: \033[0m%s\n",
+                               loadTaskName(getLocation(), getFileLines(getLocation()), 1));
+                        focus = 0;
+                        if (inputError) {
+                            inputError = false;
+                        }
+
+                    } else {
+                        inputError = true;
                     }
                 }
 
@@ -438,7 +540,6 @@ int main(void) {
                            3, color);
 
                 // draw the add button
-
                 DrawTextureEx(addTexture, (Vector2){addX, addY}, 0, addScale, WHITE);
                 drawTasks();
 
@@ -465,6 +566,32 @@ int main(void) {
 
                     } else if (focus == 1) {
                         DrawText("|", prioBox.x + MeasureTextEx(font, prioBoxInput, 24, 0).x + 8, prioBox.y + 8, 24, BLACK);
+                    }
+                }
+
+            } break;
+            case EDIT_SCREEN: {
+                DrawTextureEx(backTexture, (Vector2){10, 10}, 0, backScale, WHITE);
+
+                DrawTextEx(font, "Name: ", (Vector2){25, 10 + padding}, 24, 2, WHITE);
+                DrawRectangleRounded(textBox, 0.2f, 0, WHITE);
+                DrawTextEx(font, hoveredText, (Vector2){textBox.x + 3, textBox.y + 8}, 24, 0, BLACK);
+
+                DrawTextEx(font, "Priority: ", (Vector2){25, prioBox.y - padding + 25}, 24, 2, WHITE);
+                DrawRectangleRounded(prioBox, 0.2f, 0, WHITE);
+                DrawTextEx(font, hoveredPrio, (Vector2){prioBox.x + 3 + 5, prioBox.y + 8}, 24, 0, BLACK);
+
+                DrawRectangleRounded(saveBox, 0.5f, 0, CLITERAL(Color){47, 158, 0, 255});
+                DrawTextEx(font, "SAVE", (Vector2){(saveBox.x + saveBox.width / 2) - saveBox.x, saveBox.height / 4 + saveBox.y}, 24, 0, WHITE);
+                if (inputError) {
+                    DrawTextEx(font, "Input a proper priority(LOW, MEDIUM, HIGH)", (Vector2){prioBox.x, prioBox.y + prioBox.height + 10}, 24, 0, RED);
+                }
+                if ((frames / 30) % 2 == 0) {
+                    if (focus == 0) {
+                        DrawText("|", textBox.x + MeasureTextEx(font, hoveredText, 24, 0).x + 8, textBox.y + 8, 24, BLACK);
+
+                    } else if (focus == 1) {
+                        DrawText("|", prioBox.x + MeasureTextEx(font, hoveredPrio, 24, 0).x + 8, prioBox.y + 8, 24, BLACK);
                     }
                 }
 
